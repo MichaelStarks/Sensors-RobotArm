@@ -14,7 +14,8 @@ class RobotArm:
         self.q = Q.LifoQueue()
         self.returns = Q.LifoQueue()
         self.robot_arm_dxl = None
-        self.robot_arm_dxl = dxl.DynamixelIO("/dev/ttyUSB0")
+        self.robot_arm_dxl = dxl.DynamixelIO("/dev/ttyUSB1")
+        self.lock = self.robot_arm_dxl.lock
         self.BASE_HEIGHT = 4.3897638
         self.UPPER_ARM = 5.6929134
         self.FOREARM = 5.6889764
@@ -22,14 +23,13 @@ class RobotArm:
         for i in range(1,9):
             # print(i)
             self.motors.append(self.robot_arm_dxl.new_ax12(i))
-            self.motors[-1].torque_enable()
-            self.motors[-1].set_position_mode()
+            self.motors[-1].manual_write_lock().torque_enable()
+            self.motors[-1].manual_write_lock().set_position_mode()
         # self.set_elbow(0)
-        __start__ = threading.Thread(target=self.__start__,args=(),daemon=True)
-        __start__.start()
-        self.calibrate()
-        self.q.put((self.motors[2].set_velocity_mode,[]))
-        self.q.put((self.motors[4].set_velocity_mode,[]))
+        with self.lock:
+            self.calibrate()
+        self.motors[2].manual_write_lock().set_velocity_mode()
+        self.motors[4].manual_write_lock().set_velocity_mode()
         __shoulder_thread__ = threading.Thread(target=self.__motor_assist_shoulder__, args=(),daemon=True)
         __shoulder_thread__.start()
         __elbow_thread__ = threading.Thread(target=self.__motor_assist_shoulder__, args=(),daemon=True)
@@ -41,54 +41,37 @@ class RobotArm:
     def __del__(self):
         self.home()
 
-    def __start__(self):
-        while True:
-            items = self.q.get()
-            # print(items)
-            func = items[0]
-            args = items[1]
-            self.returns.put(func(*args))
 
     def __motor_assist_shoulder__(self):
-        velocity = 1023
+        velocity = 512
         current_shoulder = 0
         goal_shoulder = 0
-        self.q.put((self.motors[1].get_position,[]))
-        temp = self.returns.get()
-        while temp is None:
-            temp = self.returns.get()
-        current_shoulder = temp
-        self.q.put((self.motors[1].read_control_table,["Goal_Position"]))
-        temp = self.returns.get()
-        while temp is None:
-            temp = self.returns.get()
-        goal_shoulder = temp
-        if goal_shoulder == current_shoulder:
+        while True:
             direction_shoulder = 0
-        else:
-            direction_shoulder = (goal_shoulder-current_shoulder)/abs(goal_shoulder-current_shoulder)
-        print("test")
-        self.q.put((self.motors[2].set_velocity,[direction_shoulder*velocity]))
+            with self.lock:
+                current_shoulder = self.motors[1].manual_read_lock().get_position()
+                goal_shoulder = self.motors[1].manual_read_lock().read_control_table("Goal_Position")
+                if abs(goal_shoulder - current_shoulder) < 5:
+                    direction_shoulder = 0
+                else:
+                    print(True)
+                    direction_shoulder = (goal_shoulder-current_shoulder)/abs(goal_shoulder-current_shoulder)
+                self.motors[2].manual_write_lock().set_velocity(-int(direction_shoulder*velocity))
 
     def __motor_assist_elbow__(self):
-        velocity = 1023
+        velocity = 512
         current_elbow = 0
         goal_elbow = 0
-        self.q.put((self.motors[1].get_position(),[]))
-        temp = self.returns.get()
-        while temp is None:
-            temp = self.returns.get()
-        current_elbow = temp
-        self.q.put((self.motors[3].read_control_table(),["Goal_Position"]))
-        temp = self.returns.get()
-        while temp is None:
-            temp = self.returns.get()
-        goal_elbow = temp
-        if goal_elbow == current_elbow:
-            direction_shoulder = 0
-        else:
-            direction_elbow = (goal_elbow-current_elbow)/abs(goal_elbow-current_elbow)
-        self.q.put((self.motors[4].set_velocity,[direction_elbow*velocity]))
+        while True:
+            direction_elbow = 0
+            with self.lock:
+                current_elbow = self.motors[3].manual_read_lock().get_position()
+                goal_elbow = self.motors[3].manual_read_lock().read_control_table("Goal_Position")
+                if abs(goal_elbow - current_elbow) < 5:
+                    direction_elbow = 0
+                else:
+                    direction_elbow = (goal_elbow-current_elbow)/abs(goal_elbow-current_elbow)
+                self.motors[4].manual_write_lock().set_velocity(-int(direction_shoulder*velocity))
 
         # Calculates the Denavit-Hartenberg Maritx
     def __denavit_hartenberg_matrix__(self):
@@ -114,24 +97,24 @@ class RobotArm:
     def calibrate(self,show_pos=False):
         for motor in self.motors:
             if show_pos:
-                self.q.put((motor.get_position,[]))
-                print(self.returns.get())
-            self.q.put((motor.get_angle,[]))
-            self.home_angle.append(self.returns.get())
+                print(motor.manual_read_lock().get_position())
+            self.home_angle.append(motor.manual_read_lock().get_angle())
 
     def home(self):
-        for i in reversed(range(0,len(self.motors))):
-            if i != 2 and i != 4:
-                self.q.put((self.motors[i].set_angle,[self.home_angle[i]]))
-                time.sleep(.06)
+        with self.lock:
+            for i in reversed(range(0,len(self.motors))):
+                if i != 2 and i != 4:
+                    self.motors[i].manual_write_lock().set_angle(self.home_angle[i])
+                    time.sleep(.06)
 
     def set_base(self,angle,show_pos=False,radians=False):
         if radians:
             angle = np.degrees(angle)
         position = angle * (1023/300)
-        if show_pos:
-            print(int(position))
-        self.q.put((self.motors[0].set_angle,[angle]))
+        with self.lock:
+            if show_pos:
+                print(int(position))
+            self.motors[0].manual_write_lock().set_angle(angle)
 
     def set_shoulder(self,angle,show_pos=False,actual=False,radians=False):
         if radians:
@@ -141,7 +124,8 @@ class RobotArm:
         if angle < 58 or angle > 240:
             print("Out of range")
         else:
-            self.q.put((self.motors[1].set_angle,[angle]))
+            with self.lock:
+                self.motors[1].manual_write_lock().set_angle(angle)
 
     def set_elbow(self,angle,show_pos=False,actual=False,radians=False):
         if radians:
@@ -151,7 +135,8 @@ class RobotArm:
         if angle < 58 or angle > 264:
             print("Out of range")
         else:
-            self.q.put((self.motors[3].set_angle,[angle]))
+            with self.lock:
+                self.motors[3].manual_write_lock().set_angle(angle)
 
     def set_wrist_vertical(self,angle,show_pos=False,actual=False,radians=False):
         if radians:
@@ -161,51 +146,57 @@ class RobotArm:
         if angle < 54 or angle > 244:
             print("Out of range")
         else:
-            self.q.put((self.motors[5].set_angle,[angle]))
+            with self.lock:
+                self.motors[5].manual_write_lock().set_angle(angle)
 
     def set_wrist_angle(self,angle,show_pos=False,radians=False):
         if radians:
             angle = np.degrees(angle)
-        self.q.put((self.motors[6].set_angle,[angle]))
+        with self.lock:
+            self.motors[6].manual_write_lock().set_angle(angle)
 
     def hand(self,state=""):
+        angle = 0
         if state != "":
             if state == "open":
-                self.q.put((self.motors[-1].set_angle,[150]))
+                angle = 150
             if state == "close":
-                self.q.put((self.motors[-1].set_angle,[0]))
+                angle = 0
+            self.motors[-1].manual_write_lock().set_angle(angle)
 
     def full_extend(self):
-        self.set_elbow(240)
-        time.sleep(.15)
-        self.set_shoulder(150)
-        self.set_wrist_vertical(150)
+        with self.lock:
+            self.set_elbow(240)
+            time.sleep(.15)
+            self.set_shoulder(150)
+            self.set_wrist_vertical(150)
 
     def move(self,x,y,z,phi=270):
-        theta_1 = np.arctan2(y,x)
-        if True:
-            b = np.sqrt((x**2 + z**2))
-            a = np.sqrt(b**2+self.WRIST**2)
-            beta = np.arccos((b**2 + a**2 - self.WRIST**2 )/(2*a*b))
-            alpha = np.arccos((self.UPPER_ARM**2 + a**2 - self.FOREARM**2 )/(2*a*self.UPPER_ARM))
-            theta_3 = np.arccos((self.UPPER_ARM**2 + self.FOREARM**2 - a**2)/(2*self.FOREARM*self.UPPER_ARM))
-            # c = np.sqrt(x**2+self.BASE_HEIGHT**2)
-            gamma = np.arctan2(z,x)
-            theta_2 = np.pi-(alpha + beta + gamma)
-            theta_4 = 2*np.pi - (np.deg2rad(phi) + theta_3 - (alpha + beta + gamma))
-            print("Base: " + str(np.degrees(theta_1)))
-            print("Shoulder: " + str(np.degrees(theta_2)))
-            print("Elbow: " + str(np.degrees(theta_3)))
-            print("Wrist: " + str(np.degrees(theta_4)))
-            self.set_base(theta_1,radians=True)
-            self.set_shoulder(theta_2,radians=True)
-            self.set_elbow(theta_3,radians=True)
-            time.sleep(.01)
-            time.sleep(.01)
-            self.set_wrist_vertical(theta_4,actual=True,radians=True)
+        with self.lock:
+            theta_1 = np.arctan2(y,x)
+            if True:
+                b = np.sqrt((x**2 + z**2))
+                a = np.sqrt(b**2+self.WRIST**2)
+                beta = np.arccos((b**2 + a**2 - self.WRIST**2 )/(2*a*b))
+                alpha = np.arccos((self.UPPER_ARM**2 + a**2 - self.FOREARM**2 )/(2*a*self.UPPER_ARM))
+                theta_3 = np.arccos((self.UPPER_ARM**2 + self.FOREARM**2 - a**2)/(2*self.FOREARM*self.UPPER_ARM))
+                # c = np.sqrt(x**2+self.BASE_HEIGHT**2)
+                gamma = np.arctan2(z,x)
+                theta_2 = np.pi-(alpha + beta + gamma)
+                theta_4 = 2*np.pi - (np.deg2rad(phi) + theta_3 - (alpha + beta + gamma))
+                print("Base: " + str(np.degrees(theta_1)))
+                print("Shoulder: " + str(np.degrees(theta_2)))
+                print("Elbow: " + str(np.degrees(theta_3)))
+                print("Wrist: " + str(np.degrees(theta_4)))
+                self.set_base(theta_1,radians=True)
+                self.set_shoulder(theta_2,radians=True)
+                self.set_elbow(theta_3,radians=True)
+                time.sleep(.01)
+                time.sleep(.01)
+                self.set_wrist_vertical(theta_4,actual=True,radians=True)
 
-        else:
-            print("Base position can not be between 299 and 360 degrees.")
+            else:
+                print("Base position can not be between 299 and 360 degrees.")
 
 
 # start_time = time.time()
