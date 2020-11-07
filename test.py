@@ -1,52 +1,39 @@
 import numpy as np
-#
-# # Length of links in cm
-# a1= 14.44625
-# a2 = 14.44625
-# a3 = 13.97
-#
-# # Desired Position of End effector
-# px = 10 * 2.54
-# py = 4 * 2.54
-#
-# phi = 140
-# phi = deg2rad(phi)
-#
-# # Equations for Inverse kinematics
-# wx = px - a3*cos(phi)
-# wy = py - a3*sin(phi)
-#
-# delta = wx**2 + wy**2
-# c2 = ( delta -a1**2 -a2**2)/(2*a1*a2)
-# s2 = sqrt(1-c2**2)  # elbow down
-# theta_2 = arctan2(s2, c2)
-#
-# s1 = ((a1+a2*c2)*wy - a2*s2*wx)/delta
-# c1 = ((a1+a2*c2)*wx + a2*s2*wy)/delta
-# theta_1 = arctan2(s1,c1)
-# theta_3 = phi-theta_1-theta_2
-#
-# print('theta_1: ', rad2deg(theta_1))
-# print('theta_2: ', rad2deg(theta_2))
-# print('theta_3: ', rad2deg(theta_3))
 
 
-x = 4
-y = 2
-z = 1
+BASE_HEIGHT = 4.07
+UPPER_ARM = 5.7165354
+FOREARM = 5.7165354
+WRIST = 6.10236
 
-BASE_HEIGHT = 0
-UPPER_ARM = 5.6929134
-FOREARM = 5.6889764
-WRIST = 5.4015748
+phi = 380
 
-b = np.sqrt(x**2 + (z + WRIST)**2)
-print(b)
-c = np.sqrt(x**2 + z**2)
-print(c)
-num = (FOREARM**2 - UPPER_ARM**2-b**2)
-print(num)
-denom = (-2*UPPER_ARM*b)
-print(denom)
-alpha = np.arccos(num/denom)
-print(alpha)
+# def disp(x,z):
+    # a = np.sqrt(BASE_HEIGHT**2 + x**2)
+    # alpha = np.tan(x/BASE_HEIGHT)
+    # # print(alpha)
+    # b = np.sqrt((z**2 + a**2) - (2.0 * z * a * np.cos(alpha)))
+    # c = np.sqrt(x**2 + (WRIST+(z-BASE_HEIGHT))**2)
+    # omega = np.arccos((c**2 + x** 2 - (WRIST + (z-BASE_HEIGHT))**2)/(2.0*c*x))
+    # theta_2 = np.arccos((UPPER_ARM**2 + FOREARM**2 - c**2)/(2.0*UPPER_ARM*FOREARM))
+    # epsilon = np.arccos((c**2+UPPER_ARM**2-FOREARM**2)/(2.0*c*UPPER_ARM))
+    # theta_1 = np.pi - (epsilon + omega)
+    # # print(np.degrees(epsilon + omega))
+    # theta_1 = 59.0 + np.degrees(theta_1) - 20
+    # theta_2 = 60.0 + np.degrees(theta_2) - 26
+    # theta_3 = 54 + phi - theta_1 - theta_2
+    # print("Shoulder: " + str(theta_1))
+    # print("Elbow: " + str(theta_2))
+    # # print("Wrist: " + str(theta_3))
+
+
+def disp(x,z):
+    a = np.sqrt(x**2 + BASE_HEIGHT**2)
+    alpha = np.tan(x/BASE_HEIGHT)
+    omega = np.tan((WRIST + (z-BASE_HEIGHT))/x)
+    l = np.sqrt(x**2 + (WRIST + (z-BASE_HEIGHT))**2)
+    epsilon = np.arccos((UPPER_ARM**2 + l**2-FOREARM**2)/(2*UPPER_ARM*l))
+    theta_1 = np.pi - (epsilon + omega)
+    theta_2 = np.arccos((UPPER_ARM**2 + FOREARM**2 -  l**2)/(2 * UPPER_ARM * FOREARM))
+    print("Shoulder: " + str(np.degrees(theta_1) + 59))
+    print("Elbow: " + str(np.degrees(theta_2) + 60))

@@ -14,7 +14,7 @@ class RobotArm:
         self.q = Q.LifoQueue()
         self.returns = Q.LifoQueue()
         self.robot_arm_dxl = None
-        self.robot_arm_dxl = dxl.DynamixelIO("/dev/ttyUSB1")
+        self.robot_arm_dxl = dxl.DynamixelIO("/dev/ttyUSB0")
         self.lock = self.robot_arm_dxl.lock
         self.BASE_HEIGHT = 4.3897638
         self.UPPER_ARM = 5.6929134
@@ -39,7 +39,8 @@ class RobotArm:
 
 
     def __del__(self):
-        self.home()
+        for motor in self.motors:
+            motor.torque_disable()
 
 
     def __motor_assist_shoulder__(self):
@@ -71,7 +72,7 @@ class RobotArm:
                     direction_elbow = 0
                 else:
                     direction_elbow = (goal_elbow-current_elbow)/abs(goal_elbow-current_elbow)
-                self.motors[4].manual_write_lock().set_velocity(-int(direction_shoulder*velocity))
+                self.motors[4].manual_write_lock().set_velocity(-int(direction_elbow*velocity))
 
         # Calculates the Denavit-Hartenberg Maritx
     def __denavit_hartenberg_matrix__(self):
@@ -171,32 +172,50 @@ class RobotArm:
             self.set_shoulder(150)
             self.set_wrist_vertical(150)
 
-    def move(self,x,y,z,phi=270):
-        with self.lock:
-            theta_1 = np.arctan2(y,x)
-            if True:
-                b = np.sqrt((x**2 + z**2))
-                a = np.sqrt(b**2+self.WRIST**2)
-                beta = np.arccos((b**2 + a**2 - self.WRIST**2 )/(2*a*b))
-                alpha = np.arccos((self.UPPER_ARM**2 + a**2 - self.FOREARM**2 )/(2*a*self.UPPER_ARM))
-                theta_3 = np.arccos((self.UPPER_ARM**2 + self.FOREARM**2 - a**2)/(2*self.FOREARM*self.UPPER_ARM))
-                # c = np.sqrt(x**2+self.BASE_HEIGHT**2)
-                gamma = np.arctan2(z,x)
-                theta_2 = np.pi-(alpha + beta + gamma)
-                theta_4 = 2*np.pi - (np.deg2rad(phi) + theta_3 - (alpha + beta + gamma))
-                print("Base: " + str(np.degrees(theta_1)))
-                print("Shoulder: " + str(np.degrees(theta_2)))
-                print("Elbow: " + str(np.degrees(theta_3)))
-                print("Wrist: " + str(np.degrees(theta_4)))
-                self.set_base(theta_1,radians=True)
-                self.set_shoulder(theta_2,radians=True)
-                self.set_elbow(theta_3,radians=True)
-                time.sleep(.01)
-                time.sleep(.01)
-                self.set_wrist_vertical(theta_4,actual=True,radians=True)
-
-            else:
-                print("Base position can not be between 299 and 360 degrees.")
+    # def move(self,x,y,z,phi=270):
+    #     with self.lock:
+    #         theta_1 = np.arctan2(y,x)
+    #         if True:
+    #             b = np.sqrt((x**2 + z**2))
+    #             a = np.sqrt(b**2+self.WRIST**2)
+    #             beta = np.arccos((b**2 + a**2 - self.WRIST**2 )/(2*a*b))
+    #             alpha = np.arccos((self.UPPER_ARM**2 + a**2 - self.FOREARM**2 )/(2*a*self.UPPER_ARM))
+    #             theta_3 = np.arccos((self.UPPER_ARM**2 + self.FOREARM**2 - a**2)/(2*self.FOREARM*self.UPPER_ARM))
+    #             # c = np.sqrt(x**2+self.BASE_HEIGHT**2)
+    #             gamma = np.arctan2(z,x)
+    #             theta_2 = np.pi-(alpha + beta + gamma)
+    #             theta_4 = 2*np.pi - (np.deg2rad(phi) + theta_3 - (alpha + beta + gamma))
+    #             print("Base: " + str(np.degrees(theta_1)))
+    #             print("Shoulder: " + str(np.degrees(theta_2)))
+    #             print("Elbow: " + str(np.degrees(theta_3)))
+    #             print("Wrist: " + str(np.degrees(theta_4)))
+    #             self.set_base(theta_1,radians=True)
+    #             self.set_shoulder(theta_2,radians=True)
+    #             self.set_elbow(theta_3,radians=True)
+    #             time.sleep(.01)
+    #             time.sleep(.01)
+    #             self.set_wrist_vertical(theta_4,actual=True,radians=True)
+    #
+    #         else:
+    #             print("Base position can not be between 299 and 360 degrees.")
+    def move(self,x,z,phi=180):
+        alpha = np.tan(self.BASE_HEIGHT/x)
+        beta = 90 - alpha
+        b = np.sqrt(z**2+x**2-2*z*x*np.cos(beta))
+        omega = np.arctan((self.WRIST + (z-self.BASE_HEIGHT))/x)
+        zeta = np.arccos((b**2+x**2-(z-self.BASE_HEIGHT)**2)/(2*b*x))
+        delta = omega - zeta
+        c = self.WRIST/np.arccos(delta)
+        theta_2 = np.arccos((self.UPPER_ARM**2 + self.FOREARM**2 - c**2)/(2*self.UPPER_ARM*self.FOREARM))
+        epsilon = np.arccos((c**2+self.UPPER_ARM**2-self.FOREARM**2)/(2*c*self.UPPER_ARM))
+        theta_1 = np.pi - delta - epsilon-zeta
+        theta_3 = np.deg2rad(phi) - epsilon-delta-zeta-theta_2
+        print("Shoulder: " + str(np.degrees(theta_1)))
+        print("Elbow: " + str(np.degrees(theta_2)))
+        print("Wrist: " + str(np.degrees(theta_3)))
+        self.set_elbow(theta_2,radians=True)
+        self.set_shoulder(theta_1,radians=True)
+        self.set_wrist_vertical(theta_3,radians=True)
 
 
 # start_time = time.time()
