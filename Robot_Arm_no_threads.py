@@ -24,6 +24,8 @@ class RobotArm:
                 self.motors[-1].torque_enable()
         self.motors[-1].set_velocity_mode()
         self.calibrate()
+        self.set_base(0)
+        time.sleep(.5)
         self.move(5,4)
         time.sleep(.5)
         for motor in self.motors:
@@ -49,8 +51,8 @@ class RobotArm:
     def set_base(self,angle,show_pos=False,radians=False):
         if radians:
             angle = np.degrees(angle)
-        position = angle * (1023/300)
         if show_pos:
+            position = angle * (1023/300)
             print(int(position))
         self.motors[0].set_angle(angle)
 
