@@ -7,7 +7,6 @@ from dynio import *
 class RobotArm:
 
     def __init__(self):
-        self.open = True
         self.current_x = 0
         self.current_z = 0
         self.motors = [] # Motors are ordered from bottem to top
@@ -22,15 +21,14 @@ class RobotArm:
                 self.motors.append(self.robot_arm_dxl.new_ax12(i))
                 self.motors[-1].set_position_mode(goal_current=650)
                 self.motors[-1].torque_enable()
-        self.motors[-1].set_velocity_mode()
         self.calibrate()
         self.set_base(0)
         time.sleep(.5)
         self.move(5,4)
         time.sleep(.5)
         for motor in self.motors:
-            motor.set_position_mode(goal_current=350)
-        self.hand()
+            motor.set_position_mode(goal_current=300)
+        self.hand_close()
         self.set_shoulder(45)
 
     def __del__(self):
@@ -77,19 +75,17 @@ class RobotArm:
     def set_wrist_angle(self,angle,show_pos=False):
         self.motors[6].set_angle(angle)
 
-    def hand(self):
-        if self.open:
-            self.motors[-1].set_velocity_mode()
-            self.motors[-1].set_velocity(-256)
-            time.sleep(.1)
-            while(abs(self.motors[-1].read_control_table("Present_Speed")) != 0):
-                continue
-            self.motors[-1].set_velocity(0)
-            self.open = False
-        else:
-            self.open = True
-            self.motors[-1].set_position_mode()
-            self.motors[-1].set_angle(150)
+    def hand_close(self):
+        self.motors[-1].set_velocity_mode()
+        self.motors[-1].set_velocity(-256)
+        time.sleep(.1)
+        while(abs(self.motors[-1].read_control_table("Present_Speed")) != 0):
+            continue
+        self.motors[-1].set_velocity(0)
+
+    def hand_open(self):
+        self.motors[-1].set_position_mode()
+        self.motors[-1].set_angle(150)
 
     def full_extend(self):
         self.set_elbow(240)
