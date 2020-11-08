@@ -1,4 +1,4 @@
 # Sensors-RobotArm
 Arm for sensors
 
-Robot Arm used to stack painted blocks in the order of visbile light.
+Robot Arm inverse kinematics used to stack painted blocks in the order of visbile light.
