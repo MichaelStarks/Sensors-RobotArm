@@ -1,16 +1,21 @@
 import time
-from Robot_Arm_no_threads import RobotArm
+import random
+from Robot_Arm import RobotArm
 
 arm = RobotArm()
 
 
-base_angle = [0,25,45,60]
+base_angle = [107,124,145,171,187]
+colors = ["Red","Blue","Green","Yellow","Orange"]
 
-positions = {
-    0:[5,.75],
-    25:[5,.75],
-    45:[5.5,.75],
-    60:[7,.75]
+positions = {}
+
+coords = {
+    107:[6.75,.75],
+    124:[5.5,.25],
+    145:[5,.25],
+    171:[5.25,.25],
+    187:[6.5,.75]
 }
 
 # arm.hand()
@@ -18,33 +23,31 @@ def find_locations():
     for angle in base_angle:
         arm.set_base(angle)
         time.sleep(.5)
-        arm.move(positions[angle][0]-1,2)
+        arm.move(coords[angle][0]-1,2)
         time.sleep(1.5)
         # Get color at position and add to dic
 
 def stack():
-    for angle in base_angle:
+    random.shuffle(colors)
+    print(colors)
+    for color in colors:
+        angle = positions[color]
         arm.set_base(angle)
+        time.sleep(.25)
+        arm.move(coords[angle][0],4.5)
+        arm.hand_open()
+        time.sleep(.75)
+        arm.move(coords[angle][0],coords[angle][1])
+        arm.hand_close()
         time.sleep(.5)
-        arm.move(positions[angle][0],4.5)
+        arm.move(coords[angle][0],4.5)
+        arm.set_base(230)
+        time.sleep(.85)
+        arm.move(5.5,0)
         arm.hand_open()
         time.sleep(1)
-        arm.move(positions[angle][0],positions[angle][1])
-        time.sleep(.5)
+        arm.move(5,4)
         arm.hand_close()
-        time.sleep(1)
-        arm.move(positions[angle][0],2.5)
-        time.sleep(1)
-        arm.set_base(arm.home_angle[0])
-        time.sleep(1)
-        arm.move(8,1.25)
-        time.sleep(1)
-        arm.hand_open()
-        time.sleep(1)
-        arm.move(8,2.5)
-        arm.hand_close()
-        time.sleep(5)
-        # Get color at position and add to dic
 
 find_locations()
-stack()
+# stack()
