@@ -1,6 +1,5 @@
 import time
 import math
-import threading
 import numpy as np
 
 TIME_DELAY_2_4 = 0xFF:0.0024  # 2.4ms - 1 cycle  - Max Count: 1024
@@ -95,10 +94,10 @@ def colorFound(r, g, b, c):
         found = 5
     return found
 
-def match(found){
+def match(found):
     if (cases[found] == cases[lookingFor])
         return true
     else
         return false
 
-}
+
