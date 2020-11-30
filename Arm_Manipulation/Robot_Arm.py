@@ -12,7 +12,7 @@ class RobotArm:
         self.motors = [] # Motors are ordered from bottem to top
         self.home_angle = [] # Motors are ordered from bottem to top
         self.robot_arm_dxl = None
-        self.robot_arm_dxl = dxl.DynamixelIO("/dev/ttyUSB0")
+        self.robot_arm_dxl = dxl.DynamixelIO("/dev/ttyUSB1")
         self.BASE_HEIGHT = 4.07
         self.UPPER_ARM = 5.7165354
         self.FOREARM = 5.7165354
@@ -68,8 +68,11 @@ class RobotArm:
         else:
             self.motors[5].set_angle(angle)
 
-    def set_wrist_angle(self,angle,show_pos=False):
-        self.motors[6].set_angle(angle)
+    def set_wrist_angle(self,angle,actual=False,show_pos=False):
+        if actual:
+            self.motors[6].set_angle(angle)
+        else:
+            self.motors[6].set_angle(self.motors[-2].get_angle()+angle)
 
     def hand_close(self):
         self.motors[-1].set_velocity_mode()

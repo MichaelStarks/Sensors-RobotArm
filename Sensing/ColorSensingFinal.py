@@ -42,16 +42,21 @@ def scaleDown(r, g, b, c):
 
 #true or false depending on if match or not
 def colorFound(r, g, b, c):
-    if(r > b) and (r > g):
+    global found
+    ratioR = r/c
+    ratioG = g/c
+    ratioB = b/c
+    if(ratioR > ratioB) and (ratioR > ratioG):
         if (r > (b + g)):
-            found = 0
-        elif (g > 15):
-            found = 2
+            if (g > 1.25*b):
+                found = 1
+            else:
+                found = 0
         else:
-            found = 1
-    elif (g > b):
+            found = 2
+    elif (ratioG > ratioB) and (ratioG > ratioR):
         found = 3
-    elif (b > g)and (b > r):
+    elif (ratioB > ratioG)and (ratioB > ratioR):
         found = 4
     else:
         found = 5
@@ -64,9 +69,6 @@ def match(found):
         return False
 
 def isSolved():
-    if(found == 5):
-        return True
-    else:
         return False
 
 cases = {0 : 'red',
@@ -78,26 +80,30 @@ cases = {0 : 'red',
     }
 
 def whoDis():
-    rarr = np.empty(25)
-    garr = np.empty(25)
-    barr = np.empty(25)
-    carr = np.empty(25)
+    rarr = np.empty(50)
+    garr = np.empty(50)
+    barr = np.empty(50)
+    carr = np.empty(50)
     while (isSolved() == False):
-        for i in range(0, 25):
+        for i in range(0, 24):
             r, g, b, c = sensor.get_raw_data()
             rarr[i] = r
             garr[i] = g
             barr[i] = b
             carr[i] = c
-            # time.sleep(0.0024)
-            # print('Red:' + str(r), 'Green:' + str(g), 'Blue:' + str(b), 'Clear:' + str(c))
+            time.sleep(0.154)
+            #print('Red:' + str(r), 'Green:' + str(g), 'Blue:' + str(b), 'Clear:' + str(c))
         rMean = mean(rarr)
         gMean = mean(garr)
         bMean = mean(barr)
         cMean = mean(carr)
+
+        # print(rMean, gMean, bMean, cMean)
         #print('Red:' + str(rMean), 'Green:' + str(gMean), 'Blue:' + str(bMean), 'Clear:' + str(cMean))
-        r, g, b, c = scaleDown(rMean, gMean, bMean, cMean)
+        #r, g, b, c = scaleDown(rMean, gMean, bMean, cMean)
         # if (match(colorFound(r, g, b, c))):
         #      lookingFor = lookingFor + 1
         #      found = found + 1
+        # print (r, g, b, c)
+        print(cases[colorFound(r, g, b, c)])
         return cases[colorFound(r, g, b, c)]
