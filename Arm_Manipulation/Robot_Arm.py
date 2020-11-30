@@ -22,6 +22,8 @@ class RobotArm:
                 self.motors[-1].set_position_mode(goal_current=450)
                 self.motors[-1].torque_enable()
         self.calibrate()
+        for i in range(1,len(self.motors)):
+            self.motors[i].set_position_mode(goal_current = 400)
         self.set_base(140)
         time.sleep(.5)
         self.move(5,4)
