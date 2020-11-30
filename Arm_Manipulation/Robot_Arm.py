@@ -12,18 +12,18 @@ class RobotArm:
         self.motors = [] # Motors are ordered from bottem to top
         self.home_angle = [] # Motors are ordered from bottem to top
         self.robot_arm_dxl = None
-        self.robot_arm_dxl = dxl.DynamixelIO("/dev/ttyUSB1")
+        self.robot_arm_dxl = dxl.DynamixelIO("/dev/ttyUSB0")
         self.BASE_HEIGHT = 4.07
         self.UPPER_ARM = 5.7165354
         self.FOREARM = 5.7165354
         self.WRIST = 6.10236
         for i in range(1,9):
                 self.motors.append(self.robot_arm_dxl.new_ax12(i))
-                self.motors[-1].set_position_mode(goal_current=450)
+                self.motors[-1].set_position_mode(goal_current=512)
                 self.motors[-1].torque_enable()
         self.calibrate()
         for i in range(1,len(self.motors)):
-            self.motors[i].set_position_mode(goal_current = 400)
+            self.motors[i].set_position_mode(goal_current=475)
         self.set_base(140)
         time.sleep(.5)
         self.move(5,4)
@@ -50,15 +50,21 @@ class RobotArm:
         if show_pos:
             position = angle * (1023/300)
             print(int(position))
-        self.motors[0].set_angle(angle)
+        direction = -(self.motors[0].get_angle() - (angle+1))/abs(self.motors[0].get_angle() - (angle+1))
+        for move_angle in np.arange(self.motors[0].get_angle(),angle+1,2*direction):
+            self.motors[0].set_angle(move_angle)
 
     def set_shoulder(self,angleRef,radians=False):
-        self.motors[1].set_angle(angleRef + 59)
-        self.motors[2].set_angle(self.home_angle[2]-angleRef)
+        direction = -(self.motors[1].get_angle() - (angleRef+60))/abs(self.motors[1].get_angle() - (angleRef+60))
+        for move_angle in np.arange(self.motors[1].get_angle(),angleRef+60,2*direction):
+            self.motors[1].set_angle(move_angle)
+            self.motors[2].set_angle(self.home_angle[2]-(move_angle-60))
 
     def set_elbow(self,angleRef,radians=False):
-        self.motors[3].set_angle(angleRef + 60)
-        self.motors[4].set_angle(self.home_angle[4]-angleRef)
+        direction = -(self.motors[3].get_angle() - (angleRef+60))/abs(self.motors[1].get_angle() - (angleRef+60))
+        for move_angle in np.arange(self.motors[3].get_angle(),angleRef+60,2*direction):
+            self.motors[3].set_angle(move_angle)
+            self.motors[4].set_angle(self.home_angle[4]-(move_angle-60))
 
     def set_wrist_vertical(self,angle,actual=False,radians=False):
         if radians:
@@ -68,13 +74,14 @@ class RobotArm:
         if angle < 54 or angle > 244:
             print("Out of range wrist")
         else:
-            self.motors[5].set_angle(angle)
+            direction = -(self.motors[5].get_angle() - (angle+1))/abs(self.motors[5].get_angle() - (angle+1))
+            for move_angle in np.arange(self.motors[5].get_angle(),angle+1,3*direction):
+                self.motors[5].set_angle(move_angle)
 
     def set_wrist_angle(self,angle,actual=False,show_pos=False):
-        if actual:
-            self.motors[6].set_angle(angle)
-        else:
-            self.motors[6].set_angle(self.motors[-2].get_angle()+angle)
+        direction = -(self.motors[6].get_angle() - (angle+1))/abs(self.motors[6].get_angle() - (angle+1))
+        for move_angle in np.arange(self.motors[6].get_angle(),angle+1,direction):
+            self.motors[6].set_angle(move_angle)
 
     def hand_close(self):
         self.motors[-1].set_velocity_mode()
